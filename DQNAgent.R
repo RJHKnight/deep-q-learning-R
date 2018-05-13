@@ -1,14 +1,39 @@
 library(keras)
 library(tidyverse)
 
-EPISODES <- 5000
+# TODO: 
+# 1) (x) Huber Loss 
+# 2) (x) Build model
+# 3) Update target model
+# 4) (x) act
+# 5) replay
+# 6) load
+# 7) save
+# 8) run?
+# 9) (x) remember
 
-loss_huber <- function(target, prediction) {
+# Memory:
+# 1) State
+# 2) Action
+# 3) Reward
+# 4) NextState
+# 5) FinalState
+
+MAX_MEMORY_SIZE <- 2000
+
+huberLoss <- function(target, prediction) {
   
+  K <- backend()
+  
+  # calculate the metric
   error = prediction - target
-  return (mean(sqrt(1+square(error))-1))
+  errorSquared <- K$square(error)
+  rootErrorSquared <- K$sqrt(1+K$square(error))
+  
+  metric <- K$mean(rootErrorSquared -1, axis = as.integer(-1))
+  
+  return (metric)
 }
-
 
 # Neural Net for Deep-Q learning Model
 buildModel <- function(stateSize, actionSize, learningRate) {
@@ -18,14 +43,75 @@ buildModel <- function(stateSize, actionSize, learningRate) {
   model %>% 
     layer_dense(units = 24, input_shape = c(stateSize)) %>% 
     layer_activation('relu') %>% 
-    layer_dense(units = activationSize) %>% 
+    layer_dense(units = actionSize) %>% 
     layer_activation('linear')
   
   model %>% compile(
-    loss = loss_huber,
+    loss = huberLoss,
     optimizer = optimizer_adam(lr = learningRate)
     )
   
   return (model)
   
 }
+
+act <- function(self, state, epsilon, model, availableActions) {
+  
+  randomExploration <- (runif(1) <= epsilon)
+  
+  if (randomExploration) {
+    return (sample(availableActions, 1))
+  }
+  
+  actionValues <- model %>%
+    predict(state)
+    
+  return (availableActions[which.max(actionValues)])
+  
+}
+
+remember <- function(state, action, reward, nextState, finalState, memory) {
+  
+  # TODO: Optimize me.
+  thisEntry <- data.frame(state = state, 
+                          action = action,
+                          reward = reward,
+                          nextState = nextState,
+                          finalState = finalState)
+  
+  if (is.na(memory)) {
+    return (thisEntry)
+  }
+  
+  if (nrow(memory) >= MAX_MEMORY_SIZE)
+    memory <- memory[-1,]
+  
+  return (rbind(memory, thisEntry))
+}
+
+
+replay <- function(memory, model, batchSize) {
+  
+  miniBatch <- sample(memory, batchSize)
+  
+  for (i in 1:batchSize) {
+    
+     thisState <- memory$state[i]
+     thisFinalState <- memory$finalState[i]
+     
+     model %>%
+      predict(thisState)
+     
+     if (thisFinalState) {
+       
+     }
+  }
+}
+
+updateTargetModel <- function(model, targetModel) {
+  
+  targetModel$set_weights(model$getWeights())
+  
+  return (targetModel)  
+}
+  
