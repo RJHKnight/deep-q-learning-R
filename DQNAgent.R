@@ -55,12 +55,12 @@ buildModel <- function(stateSize, actionSize, learningRate) {
   
 }
 
-act <- function(self, state, epsilon, model, availableActions) {
+act <- function(state, epsilon, model, availableActions) {
   
   randomExploration <- (runif(1) <= epsilon)
   
   if (randomExploration) {
-    return (sample(availableActions, 1))
+    return (sample(availableActions$n, 1))
   }
   
   actionValues <- model %>%
@@ -90,22 +90,41 @@ remember <- function(state, action, reward, nextState, finalState, memory) {
 }
 
 
-replay <- function(memory, model, batchSize) {
+replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilonMin, epsilonDecay) {
   
-  miniBatch <- sample(memory, batchSize)
+  miniBatch <- sample(nrow(memory), batchSize)
   
   for (i in 1:batchSize) {
     
      thisState <- memory$state[i]
      thisFinalState <- memory$finalState[i]
+     thisAction <- memory$action[i]
+     thisReward <- memory$reward[i]
+     thisNextState <- memory$nextState[i]
      
-     model %>%
-      predict(thisState)
+     target <- model %>%
+        predict(thisState)
      
      if (thisFinalState) {
+       target[thisAction] <- thisReward
+     }
+     else {
+       t <- targetModel %>%
+         predict(nextState)
        
+       target[thisAction] = thisReward + (gamma * t[which.max(t)])
+       
+       model %>%
+         fit(thisState, target, epochs = 1, verbose = FALSE)
      }
   }
+     
+  if (epsilon > epsilonMin) {
+    epsilon = epsilon * epsilonDecay
+  }
+  
+  return (epsilon)
+    
 }
 
 updateTargetModel <- function(model, targetModel) {

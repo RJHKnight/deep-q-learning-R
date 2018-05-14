@@ -7,7 +7,7 @@ EPISODES <- 5000
 BATCH_SIZE <- 32
 LEARNING_RATE <- 0.001
 GAMMA <- 0.95
-EPSILON <- 1.0
+EPSILON_START <- 1.0
 EPSILON_MIN <- 0.01
 EPSILON_DECAY <- 0.99
 
@@ -23,8 +23,57 @@ actionSpace <- env_action_space_info(client, instanceID)
 stateSpace <- env_observation_space_info(client, instanceID)$shape[[1]]
 
 # Build the DL models for Q estimation.
-model <- buildModel(stateSize = stateSpace, actionSize = actionSpace, learningRate = LEARNING_RATE)
-targetModel <- buildModel(stateSize = stateSpace, actionSize = actionSpace, learningRate = LEARNING_RATE)
+model <- buildModel(stateSize = stateSpace, actionSize = actionSpace$n, learningRate = LEARNING_RATE)
+targetModel <- buildModel(stateSize = stateSpace, actionSize = actionSpace$n, learningRate = LEARNING_RATE)
+
+# Initialise epsilon and memory.
+epsilon <- EPSILON_START
+memory <- NA
+
+for (i in 1:EPISODES) {
+   
+  state <- unlist(env_reset(client, instanceID))
+  
+  for (t in 1:500) {
+    
+    thisAction <- act(state = state,
+                  model = model,
+                  epsilon = epsilon,
+                  availableActions = actionSpace)
+    
+    nextState <- env_step(
+      client,
+      instanceID,
+      0,
+      render = FALSE
+    )
+    
+    reward <- ifelse(nextState$done, -10, nextState$reward)
+    memory <- remember(state, thisAction, reward, nextState$observation, nextState$done, memory)
+    state <- nextState
+    
+    if (nextState$done) {
+      updateTargetModel(model, targetModel)
+      print(paste("Episode:", i, "/", EPISODES, Sys.time(), epsilon))
+    }
+    
+    if (nrow(memory) > BATCH_SIZE) {
+      
+      replay(
+        memory = memory, 
+        model = model, 
+        targetModel = targetModel, 
+        batchSize = BATCH_SIZE, 
+        gamma = GAMMA,
+        epsilon = epsilon,
+        epsilonMin = EPSILON_MIN,
+        epsilonDecay = EPSILON_DECAY
+      )
+    }
+  }
+}
+
+
 
 # Dump result info to disk
 env_monitor_close(client, instanceID)
