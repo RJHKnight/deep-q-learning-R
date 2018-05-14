@@ -15,7 +15,6 @@ print(all_envs)
 # Set up agent
 action_space_info <- env_action_space_info(client, instance_id)
 print(action_space_info)
-agent <- random_discrete_agent(action_space_info[["n"]])
 
 # Run experiment, with monitor
 outdir <- "/tmp/random-agent-results"

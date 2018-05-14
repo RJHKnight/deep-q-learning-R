@@ -1,6 +1,6 @@
 library(gym)
 
-source("DQNAgent.R")
+debugSource("DQNAgent.R")
 
 # Parameters.
 EPISODES <- 5000
@@ -28,7 +28,7 @@ targetModel <- buildModel(stateSize = stateSpace, actionSize = actionSpace$n, le
 
 # Initialise epsilon and memory.
 epsilon <- EPSILON_START
-memory <- NA
+memory <- NULL
 
 for (i in 1:EPISODES) {
    
@@ -44,22 +44,23 @@ for (i in 1:EPISODES) {
     nextState <- env_step(
       client,
       instanceID,
-      0,
-      render = FALSE
+      thisAction,
+      render = TRUE
     )
     
     reward <- ifelse(nextState$done, -10, nextState$reward)
-    memory <- remember(state, thisAction, reward, nextState$observation, nextState$done, memory)
-    state <- nextState
+    memory <- remember(state, thisAction, reward, unlist(nextState$observation), nextState$done, memory)
+    state <- unlist(nextState$observation)
     
     if (nextState$done) {
       updateTargetModel(model, targetModel)
-      print(paste("Episode:", i, "/", EPISODES, Sys.time(), epsilon))
+      print(paste("Episode:", i, "/", EPISODES, "Score:", t, "Epsilon:", epsilon))
+      break;
     }
     
     if (nrow(memory) > BATCH_SIZE) {
       
-      replay(
+      epsilon <- replay(
         memory = memory, 
         model = model, 
         targetModel = targetModel, 

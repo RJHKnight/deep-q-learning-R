@@ -60,26 +60,26 @@ act <- function(state, epsilon, model, availableActions) {
   randomExploration <- (runif(1) <= epsilon)
   
   if (randomExploration) {
-    return (sample(availableActions$n, 1))
+    return (sample(availableActions$n, 1)-1)
   }
   
   actionValues <- model %>%
-    predict(state)
+    predict(matrix(state, nrow=1))
     
-  return (availableActions[which.max(actionValues)])
+  return (which.max(actionValues)-1)
   
 }
 
 remember <- function(state, action, reward, nextState, finalState, memory) {
   
   # TODO: Optimize me.
-  thisEntry <- data.frame(state = state, 
+  thisEntry <- data.frame(state = t(state), 
                           action = action,
                           reward = reward,
-                          nextState = nextState,
+                          nextState = t(nextState),
                           finalState = finalState)
   
-  if (is.na(memory)) {
+  if (is.null(memory)) {
     return (thisEntry)
   }
   
@@ -96,11 +96,15 @@ replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilo
   
   for (i in 1:batchSize) {
     
-     thisState <- memory$state[i]
+     thisStateColumns =  grep("state", names(memory), value=T)
+     nextStateColumns =  grep("nextState", names(memory), value=T)
+
+     thisState <- as.matrix(memory[i,thisStateColumns])
+     thisNextState <- as.matrix(memory[i, nextStateColumns])
+     
      thisFinalState <- memory$finalState[i]
      thisAction <- memory$action[i]
      thisReward <- memory$reward[i]
-     thisNextState <- memory$nextState[i]
      
      target <- model %>%
         predict(thisState)
@@ -110,7 +114,7 @@ replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilo
      }
      else {
        t <- targetModel %>%
-         predict(nextState)
+         predict(thisNextState)
        
        target[thisAction] = thisReward + (gamma * t[which.max(t)])
        
@@ -129,7 +133,7 @@ replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilo
 
 updateTargetModel <- function(model, targetModel) {
   
-  targetModel$set_weights(model$getWeights())
+  targetModel$set_weights(model$get_weights())
   
   return (targetModel)  
 }
