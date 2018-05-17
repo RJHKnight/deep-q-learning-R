@@ -47,7 +47,7 @@ buildModel <- function(stateSize, actionSize, learningRate) {
     layer_activation('linear')
   
   model %>% compile(
-    loss = huberLoss,
+    loss = loss_mean_absolute_error,
     optimizer = optimizer_adam(lr = learningRate)
     )
   
@@ -116,11 +116,11 @@ replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilo
        t <- targetModel %>%
          predict(thisNextState)
        
-       target[thisAction] = thisReward + (gamma * t[which.max(t)])
-       
-       model %>%
-         fit(thisState, target, epochs = 1, verbose = FALSE)
+       target[thisAction+1] = thisReward #+ (gamma * t[which.max(t)])
      }
+     
+     model %>%
+       fit(thisState, target, epochs = 1, verbose = FALSE)
   }
      
   if (epsilon > epsilonMin) {

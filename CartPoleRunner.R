@@ -11,6 +11,9 @@ EPSILON_START <- 1.0
 EPSILON_MIN <- 0.01
 EPSILON_DECAY <- 0.99
 
+if (exists("memory"))
+  rm(memory)
+
 # Open AI Gym Environment.
 remoteURL <- "http://127.0.0.1:5000"
 client <- create_GymClient(remoteURL)
@@ -33,9 +36,10 @@ memory <- NULL
 for (i in 1:EPISODES) {
    
   state <- unlist(env_reset(client, instanceID))
-  
-  for (t in 1:500) {
+  score <- 1
+  while (TRUE) {
     
+    score = score + 1
     thisAction <- act(state = state,
                   model = model,
                   epsilon = epsilon,
@@ -45,33 +49,35 @@ for (i in 1:EPISODES) {
       client,
       instanceID,
       thisAction,
-      render = TRUE
+      render = FALSE
     )
     
-    reward <- ifelse(nextState$done, -10, nextState$reward)
+    reward <- ifelse(nextState$done, -50, nextState$reward)
     memory <- remember(state, thisAction, reward, unlist(nextState$observation), nextState$done, memory)
     state <- unlist(nextState$observation)
     
     if (nextState$done) {
       updateTargetModel(model, targetModel)
-      print(paste("Episode:", i, "/", EPISODES, "Score:", t, "Epsilon:", epsilon))
+      print(paste("Episode:", i, "/", EPISODES, "Score:", score, "Epsilon:", epsilon))
       break;
     }
     
-    if (nrow(memory) > BATCH_SIZE) {
-      
-      epsilon <- replay(
-        memory = memory, 
-        model = model, 
-        targetModel = targetModel, 
-        batchSize = BATCH_SIZE, 
-        gamma = GAMMA,
-        epsilon = epsilon,
-        epsilonMin = EPSILON_MIN,
-        epsilonDecay = EPSILON_DECAY
-      )
-    }
   }
+  
+  if (nrow(memory) > BATCH_SIZE) {
+    
+    epsilon <- replay(
+      memory = memory, 
+      model = model, 
+      targetModel = targetModel, 
+      batchSize = BATCH_SIZE, 
+      gamma = GAMMA,
+      epsilon = epsilon,
+      epsilonMin = EPSILON_MIN,
+      epsilonDecay = EPSILON_DECAY
+    )
+  }
+  
 }
 
 
