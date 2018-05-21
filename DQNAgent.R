@@ -93,48 +93,55 @@ remember <- function(state, action, reward, nextState, finalState, memory) {
 }
 
 
+matrixToList <- function(x) {
+  lapply(1:nrow(x), function(i) x[i,])
+}
+
 replay <- function(memory, model, targetModel, batchSize, gamma) {
   
   if (nrow(memory) < MIN_MEMORY_SIZE) {
     return ()
   }
   
+  thisStateColumns =  grep("state", names(memory), value=T)
+  nextStateColumns =  grep("nextState", names(memory), value=T)
   miniBatch <- memory[sample(nrow(memory), batchSize),]
   
+  thisState <- as.matrix(miniBatch[,thisStateColumns])
+  thisNextState <- as.matrix(miniBatch[, nextStateColumns])
+  
+  target <- matrix(rep(NA, 2 * batchSize), ncol = 2)
+  
   for (i in 1:batchSize) {
-    
-     thisStateColumns =  grep("state", names(memory), value=T)
-     nextStateColumns =  grep("nextState", names(memory), value=T)
 
-     thisState <- as.matrix(miniBatch[i, thisStateColumns])
-     thisNextState <- as.matrix(miniBatch[i, nextStateColumns])
-     
      thisFinalState <- miniBatch$finalState[i]
      thisAction <- miniBatch$action[i]
      thisReward <- miniBatch$reward[i]
      
-     target <- model %>%
-        predict(thisState)
+     thisTarget <- model %>%
+        predict(matrix(thisState[i,], ncol = 4))
      
      targetNext <- model %>%
-       predict(thisNextState)
+       predict(matrix(thisNextState[i,], ncol=4))
      
      targetVal = targetModel %>%
-       predict(thisNextState)
+       predict(matrix(thisNextState[i,], ncol=4))
      
      if (thisFinalState) {
-       target[thisAction+1] <- thisReward
+       thisTarget[thisAction+1] <- thisReward
      }
      else {
        
        action = which.max(targetNext)
-       target[thisAction+1] = thisReward + (gamma * targetVal[action])
+       thisTarget[thisAction+1] = thisReward + (gamma * targetVal[action])
      }
      
-     model %>%
-       fit(thisState, target, epochs = 1, verbose = FALSE)
+     target[i,] <- thisTarget
+     
   }
   
+  model %>%
+    fit(thisState, target, epochs = 1, verbose = FALSE)
   
   return ()
     
