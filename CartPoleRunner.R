@@ -1,9 +1,10 @@
 library(gym)
+library(profvis)
 
 debugSource("DQNAgent.R")
 
 # Parameters.
-EPISODES <- 5000
+EPISODES <- 100
 BATCH_SIZE <- 64
 LEARNING_RATE <- 0.001
 GAMMA <- 0.99
@@ -32,6 +33,7 @@ targetModel <- buildModel(stateSize = stateSpace, actionSize = actionSpace$n, le
 # Initialise epsilon and memory.
 epsilon <- EPSILON_START
 memory <- NULL
+
 
 for (i in 1:EPISODES) {
    
@@ -80,7 +82,6 @@ for (i in 1:EPISODES) {
     }
   }
 }
-
 
 
 # Dump result info to disk

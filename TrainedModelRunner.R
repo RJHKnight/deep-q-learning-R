@@ -21,7 +21,7 @@ while (TRUE) {
   score <- score + 1
   
   thisAction <- act(state = state,
-                    model = model,
+                    model = targetModel,
                     epsilon = 0,
                     availableActions = actionSpace)
   
@@ -37,8 +37,8 @@ while (TRUE) {
     break;
   }
   
-  Sys.sleep(1)
-  state <- unlist(nextState$observation)
+  Sys.sleep(0.02)
+  state <- unlist(state$observation)
 }
 
 Sys.sleep(10)

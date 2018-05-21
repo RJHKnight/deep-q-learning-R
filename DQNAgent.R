@@ -110,38 +110,35 @@ replay <- function(memory, model, targetModel, batchSize, gamma) {
   thisState <- as.matrix(miniBatch[,thisStateColumns])
   thisNextState <- as.matrix(miniBatch[, nextStateColumns])
   
-  target <- matrix(rep(NA, 2 * batchSize), ncol = 2)
+  thisTarget <- model %>%
+    predict(thisState)
+  
+  targetNext <- model %>%
+    predict(thisNextState)
+  
+  targetVal = targetModel %>%
+    predict(thisNextState)
   
   for (i in 1:batchSize) {
 
      thisFinalState <- miniBatch$finalState[i]
      thisAction <- miniBatch$action[i]
      thisReward <- miniBatch$reward[i]
-     
-     thisTarget <- model %>%
-        predict(matrix(thisState[i,], ncol = 4))
-     
-     targetNext <- model %>%
-       predict(matrix(thisNextState[i,], ncol=4))
-     
-     targetVal = targetModel %>%
-       predict(matrix(thisNextState[i,], ncol=4))
+
      
      if (thisFinalState) {
-       thisTarget[thisAction+1] <- thisReward
+       thisTarget[i, thisAction+1] <- thisReward
      }
      else {
        
-       action = which.max(targetNext)
-       thisTarget[thisAction+1] = thisReward + (gamma * targetVal[action])
+       action = which.max(targetNext[i,])
+       thisTarget[i, thisAction+1] = thisReward + (gamma * targetVal[i, action])
      }
-     
-     target[i,] <- thisTarget
      
   }
   
   model %>%
-    fit(thisState, target, epochs = 1, verbose = FALSE)
+    fit(thisState, thisTarget, epochs = 1, verbose = FALSE)
   
   return ()
     
