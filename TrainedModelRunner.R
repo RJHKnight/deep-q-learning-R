@@ -37,8 +37,9 @@ while (TRUE) {
     break;
   }
   
-  Sys.sleep(0.25)
+  Sys.sleep(1)
   state <- unlist(nextState$observation)
 }
 
+Sys.sleep(10)
 env_monitor_close(client, instanceID)

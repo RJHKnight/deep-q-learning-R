@@ -20,6 +20,7 @@ library(tidyverse)
 # 5) FinalState
 
 MAX_MEMORY_SIZE <- 2000
+MIN_MEMORY_SIZE <- 1000
 
 huberLoss <- function(target, prediction) {
   
@@ -28,9 +29,9 @@ huberLoss <- function(target, prediction) {
   # calculate the metric
   error = prediction - target
   errorSquared <- K$square(error)
-  rootErrorSquared <- K$sqrt(1+K$square(error))
+  rootErrorSquared <- K$sqrt(K$constant(1, dtype = "float32") + K$square(error))
   
-  metric <- K$mean(rootErrorSquared -1, axis = as.integer(-1))
+  metric <- K$mean(rootErrorSquared-1)
   
   return (metric)
 }
@@ -41,18 +42,20 @@ buildModel <- function(stateSize, actionSize, learningRate) {
   model <- keras_model_sequential() 
   
   model %>% 
-    layer_dense(units = 24, input_shape = c(stateSize)) %>% 
+    layer_dense(units = 24, input_shape = c(stateSize), kernel_initializer = 'he_uniform') %>% 
     layer_activation('relu') %>% 
-    layer_dense(units = actionSize) %>% 
+    layer_dense(units = 24, input_shape = c(stateSize), kernel_initializer = 'he_uniform') %>% 
+    layer_activation('relu') %>% 
+    layer_dense(units = actionSize, kernel_initializer = 'he_uniform') %>% 
     layer_activation('linear')
   
   model %>% compile(
-    loss = loss_mean_absolute_error,
+    loss = loss_mean_squared_error,
     optimizer = optimizer_adam(lr = learningRate)
     )
   
   return (model)
-  
+
 }
 
 act <- function(state, epsilon, model, availableActions) {
@@ -90,44 +93,50 @@ remember <- function(state, action, reward, nextState, finalState, memory) {
 }
 
 
-replay <- function(memory, model, targetModel, batchSize, gamma, epsilon, epsilonMin, epsilonDecay) {
+replay <- function(memory, model, targetModel, batchSize, gamma) {
   
-  miniBatch <- sample(nrow(memory), batchSize)
+  if (nrow(memory) < MIN_MEMORY_SIZE) {
+    return ()
+  }
+  
+  miniBatch <- memory[sample(nrow(memory), batchSize),]
   
   for (i in 1:batchSize) {
     
      thisStateColumns =  grep("state", names(memory), value=T)
      nextStateColumns =  grep("nextState", names(memory), value=T)
 
-     thisState <- as.matrix(memory[i,thisStateColumns])
-     thisNextState <- as.matrix(memory[i, nextStateColumns])
+     thisState <- as.matrix(miniBatch[i, thisStateColumns])
+     thisNextState <- as.matrix(miniBatch[i, nextStateColumns])
      
-     thisFinalState <- memory$finalState[i]
-     thisAction <- memory$action[i]
-     thisReward <- memory$reward[i]
+     thisFinalState <- miniBatch$finalState[i]
+     thisAction <- miniBatch$action[i]
+     thisReward <- miniBatch$reward[i]
      
      target <- model %>%
         predict(thisState)
      
+     targetNext <- model %>%
+       predict(thisNextState)
+     
+     targetVal = targetModel %>%
+       predict(thisNextState)
+     
      if (thisFinalState) {
-       target[thisAction] <- thisReward
+       target[thisAction+1] <- thisReward
      }
      else {
-       t <- targetModel %>%
-         predict(thisNextState)
        
-       target[thisAction+1] = thisReward #+ (gamma * t[which.max(t)])
+       action = which.max(targetNext)
+       target[thisAction+1] = thisReward + (gamma * targetVal[action])
      }
      
      model %>%
        fit(thisState, target, epochs = 1, verbose = FALSE)
   }
-     
-  if (epsilon > epsilonMin) {
-    epsilon = epsilon * epsilonDecay
-  }
   
-  return (epsilon)
+  
+  return ()
     
 }
 

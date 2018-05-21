@@ -4,12 +4,12 @@ debugSource("DQNAgent.R")
 
 # Parameters.
 EPISODES <- 5000
-BATCH_SIZE <- 32
+BATCH_SIZE <- 64
 LEARNING_RATE <- 0.001
-GAMMA <- 0.95
+GAMMA <- 0.99
 EPSILON_START <- 1.0
 EPSILON_MIN <- 0.01
-EPSILON_DECAY <- 0.99
+EPSILON_DECAY <- 0.999
 
 if (exists("memory"))
   rm(memory)
@@ -37,6 +37,7 @@ for (i in 1:EPISODES) {
    
   state <- unlist(env_reset(client, instanceID))
   score <- 1
+  
   while (TRUE) {
     
     score = score + 1
@@ -52,32 +53,32 @@ for (i in 1:EPISODES) {
       render = FALSE
     )
     
-    reward <- ifelse(nextState$done, -50, nextState$reward)
+    reward <- ifelse(nextState$done & score < 499, -100, nextState$reward)
     memory <- remember(state, thisAction, reward, unlist(nextState$observation), nextState$done, memory)
+    
+    if (epsilon > EPSILON_MIN) {
+      epsilon = epsilon * EPSILON_DECAY
+    }
+    
     state <- unlist(nextState$observation)
+    
+    if (nrow(memory) > BATCH_SIZE) {
+      
+      replay(
+        memory = memory, 
+        model = model, 
+        targetModel = targetModel,
+        batchSize = BATCH_SIZE, 
+        gamma = GAMMA
+      )
+    }
     
     if (nextState$done) {
       updateTargetModel(model, targetModel)
       print(paste("Episode:", i, "/", EPISODES, "Score:", score, "Epsilon:", epsilon))
       break;
     }
-    
   }
-  
-  if (nrow(memory) > BATCH_SIZE) {
-    
-    epsilon <- replay(
-      memory = memory, 
-      model = model, 
-      targetModel = targetModel, 
-      batchSize = BATCH_SIZE, 
-      gamma = GAMMA,
-      epsilon = epsilon,
-      epsilonMin = EPSILON_MIN,
-      epsilonDecay = EPSILON_DECAY
-    )
-  }
-  
 }
 
 
